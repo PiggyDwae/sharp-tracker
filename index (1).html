@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sharp Line Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f8f8f6;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.1);
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --hint: #9c9a92;
+    --success-bg: #eaf3de;
+    --success-text: #3b6d11;
+    --success-border: #97c459;
+    --danger-bg: #fcebeb;
+    --danger-text: #a32d2d;
+    --danger-border: #f09595;
+    --warning-bg: #faeeda;
+    --warning-text: #854f0b;
+    --warning-border: #ef9f27;
+    --info-bg: #e6f1fb;
+    --info-text: #185fa5;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --pinnacle: #c8102e;
+    --draftkings: #53d337;
+    --fanduel: #1493ff;
+    --betmgm: #c8a951;
+    --sharp-color: #378ADD;
+    --soft-color: #E24B4A;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+  .logo span { color: var(--sharp-color); }
+
+  .header-right { display: flex; align-items: center; gap: 0.75rem; }
+
+  .api-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted);
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--hint); }
+  .status-dot.connected { background: #639922; }
+  .status-dot.error { background: #E24B4A; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+  .setup-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; font-weight: 500; color: var(--hint); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  input[type=text], input[type=password], select {
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0 10px;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type=text]:focus, input[type=password]:focus, select:focus { border-color: var(--sharp-color); }
+
+  .btn {
+    height: 36px;
+    padding: 0 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.danger { border-color: var(--danger-border); color: var(--danger-text); }
+  .btn.danger:hover { background: var(--danger-bg); }
+
+  .grid-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+  }
+  .metric-label { font-size: 11px; color: var(--hint); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .metric-value { font-size: 24px; font-weight: 600; color: var(--text); }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .metric-value.up { color: var(--success-text); }
+  .metric-value.down { color: var(--danger-text); }
+
+  .grid-main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) { .grid-main { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .card-title { font-size: 13px; font-weight: 600; }
+  .card-body { padding: 1.25rem; }
+
+  .game-list { }
+  .game-item {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .game-item:last-child { border-bottom: none; }
+  .game-item:hover { background: var(--bg); }
+  .game-item.active { background: var(--info-bg); border-left: 3px solid var(--sharp-color); }
+
+  .game-teams { font-size: 13px; font-weight: 500; }
+  .game-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .game-signal { flex-shrink: 0; }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+  }
+  .tag-sharp { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+  .tag-public { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+  .tag-watch { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+  .tag-neutral { background: var(--bg); color: var(--muted); border-color: var(--border); }
+  .tag-sharp-book { background: #1a1a18; color: #fff; }
+
+  .book-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .book-row:last-child { border-bottom: none; }
+  .book-name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+  .book-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .book-odds { display: flex; gap: 1.5rem; }
+  .book-odd { text-align: right; }
+  .book-odd-val { font-size: 14px; font-weight: 600; }
+  .book-odd-lbl { font-size: 10px; color: var(--hint); }
+
+  .gap-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  .chart-wrap { position: relative; height: 260px; }
+
+  .history-table { width: 100%; border-collapse: collapse; }
+  .history-table th {
+    font-size: 11px; font-weight: 500; color: var(--hint);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 0.5rem 0.75rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .history-table td { padding: 0.5rem 0.75rem; font-size: 12px; border-bottom: 1px solid var(--border); }
+  .history-table tr:last-child td { border-bottom: none; }
+  .history-table tr:hover td { background: var(--bg); }
+
+  .signal-box {
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .signal-box.sharp { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+  .signal-box.watch { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+  .signal-box.neutral { background: var(--bg); color: var(--muted); }
+
+  .empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--hint);
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 0.75rem; }
+  .empty-title { font-size: 15px; font-weight: 500; color: var(--muted); margin-bottom: 0.5rem; }
+  .empty-desc { font-size: 13px; }
+
+  .loading {
+    text-align: center; padding: 2rem; color: var(--muted); font-size: 13px;
+  }
+
+  .refresh-btn { font-size: 12px; padding: 0 10px; height: 28px; }
+
+  .api-setup {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    text-align: center;
+    max-width: 480px;
+    margin: 3rem auto;
+  }
+  .api-setup h2 { font-size: 18px; font-weight: 600; margin-bottom: 0.5rem; }
+  .api-setup p { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; line-height: 1.6; }
+  .api-setup a { color: var(--sharp-color); text-decoration: none; }
+  .api-setup a:hover { text-decoration: underline; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    padding: 0.625rem 1rem;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s;
+    margin-bottom: -1px;
+  }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--text); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .sport-selector {
+    display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+  }
+  .sport-btn {
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+    cursor: pointer; transition: all 0.1s;
+  }
+  .sport-btn.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  .book-toggle { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .book-toggle-btn {
+    padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+    cursor: pointer; transition: all 0.1s;
+  }
+  .book-toggle-btn.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Sharp<span>Line</span> Tracker</div>
+  <div class="header-right">
+    <div class="api-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Not connected</span>
+    </div>
+    <button class="btn" onclick="showSettings()">Settings</button>
+  </div>
+</header>
+
+<main id="main-content">
+
+  <div id="setup-screen" class="api-setup" style="display:none;">
+    <div style="font-size:36px;margin-bottom:1rem;">📈</div>
+    <h2>Connect to OddsPapi</h2>
+    <p>Get your free API key at <a href="https://oddspapi.io" target="_blank">oddspapi.io</a> — no credit card required. Includes Pinnacle, DraftKings, FanDuel, and 350+ books.</p>
+    <div class="field" style="text-align:left;margin-bottom:1rem;">
+      <label>API Key</label>
+      <input type="password" id="api-key-input" placeholder="Paste your OddsPapi API key" style="width:100%;">
+    </div>
+    <button class="btn primary" onclick="saveKey()" style="width:100%;">Connect</button>
+    <p style="margin-top:1rem;font-size:12px;color:var(--hint);">Your key is stored locally in your browser and never sent anywhere except OddsPapi.</p>
+  </div>
+
+  <div id="app-content" style="display:none;">
+
+    <div class="setup-bar">
+      <div class="field">
+        <label>Sport</label>
+        <select id="sport-select" onchange="onSportChange()" style="width:160px;">
+          <option value="13">MLB — Baseball</option>
+          <option value="11">NBA — Basketball</option>
+          <option value="14">NFL — Football</option>
+          <option value="15">NHL — Hockey</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Books to compare</label>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;height:36px;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400;cursor:pointer;">
+            <input type="checkbox" id="book-pinnacle" checked onchange="refreshGames()"> <span style="color:#c8102e;font-weight:500;">Pinnacle</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400;cursor:pointer;">
+            <input type="checkbox" id="book-draftkings" checked onchange="refreshGames()"> DraftKings
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400;cursor:pointer;">
+            <input type="checkbox" id="book-fanduel" checked onchange="refreshGames()"> FanDuel
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400;cursor:pointer;">
+            <input type="checkbox" id="book-betmgm" onchange="refreshGames()"> BetMGM
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400;cursor:pointer;">
+            <input type="checkbox" id="book-singbet" onchange="refreshGames()"> Singbet
+          </label>
+        </div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:0.5rem;align-items:flex-end;">
+        <button class="btn refresh-btn" onclick="refreshGames()">Refresh</button>
+        <button class="btn danger refresh-btn" onclick="clearHistory()">Clear history</button>
+      </div>
+    </div>
+
+    <div class="grid-metrics" id="metrics-row" style="display:none;">
+      <div class="metric">
+        <div class="metric-label">Games tracked</div>
+        <div class="metric-value" id="m-games">0</div>
+        <div class="metric-sub">this session</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Sharp signals</div>
+        <div class="metric-value" id="m-signals">0</div>
+        <div class="metric-sub">lines diverged</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Last refresh</div>
+        <div class="metric-value" id="m-refresh" style="font-size:16px;">—</div>
+        <div class="metric-sub">auto every 5 min</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">API requests used</div>
+        <div class="metric-value" id="m-requests">0</div>
+        <div class="metric-sub">of 250/month free</div>
+      </div>
+    </div>
+
+    <div class="grid-main">
+
+      <div>
+        <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-header">
+            <div class="card-title">Today's games</div>
+            <div id="games-sport-label" style="font-size:12px;color:var(--muted);"></div>
+          </div>
+          <div id="games-list">
+            <div class="loading">Loading games...</div>
+          </div>
+        </div>
+
+        <div class="card" id="game-detail" style="display:none;">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="detail-title">Game detail</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="detail-time"></div>
+            </div>
+            <div id="detail-signal-tag"></div>
+          </div>
+          <div class="card-body">
+
+            <div id="signal-box-detail" class="signal-box neutral" style="display:none;"></div>
+
+            <div style="margin-bottom:1rem;">
+              <div style="font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">Current odds by book</div>
+              <div id="book-comparison"></div>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <div style="font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">Sharp vs soft gap</div>
+              <div id="gap-analysis"></div>
+            </div>
+
+            <div>
+              <div style="font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">Line movement chart</div>
+              <div class="legend" id="chart-legend"></div>
+              <div class="chart-wrap">
+                <canvas id="movement-chart" role="img" aria-label="Line movement chart for selected game"></canvas>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-header">
+            <div class="card-title">Movement history</div>
+            <span style="font-size:11px;color:var(--hint);">Auto-logged every refresh</span>
+          </div>
+          <div id="history-panel">
+            <div class="empty">
+              <div class="empty-title">No history yet</div>
+              <div class="empty-desc">Select a game to start tracking its line movement over time.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Sharp signals today</div></div>
+          <div id="signals-panel">
+            <div class="empty">
+              <div class="empty-title">Scanning...</div>
+              <div class="empty-desc">Signals appear when Pinnacle diverges from soft books.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<script>
+var API_BASE = 'https://api.oddspapi.io/v4';
+var apiKey = '';
+var currentSportId = 13;
+var games = [];
+var selectedGame = null;
+var history = {};
+var requestCount = 0;
+var chart = null;
+var refreshTimer = null;
+
+var BOOK_COLORS = {
+  pinnacle: '#c8102e',
+  draftkings: '#53d337',
+  fanduel: '#1493ff',
+  betmgm: '#c8a951',
+  singbet: '#7f77dd',
+  williamhill: '#00843d',
+  bet365: '#007b5e'
+};
+
+var BOOK_LABELS = {
+  pinnacle: 'Pinnacle',
+  draftkings: 'DraftKings',
+  fanduel: 'FanDuel',
+  betmgm: 'BetMGM',
+  singbet: 'Singbet',
+  williamhill: 'William Hill',
+  bet365: 'Bet365'
+};
+
+var SPORT_IDS = { 13: 'MLB', 11: 'NBA', 14: 'NFL', 15: 'NHL' };
+var TOURNAMENT_CACHE = {};
+
+function init() {
+  apiKey = localStorage.getItem('sharptracker_apikey') || '';
+  history = JSON.parse(localStorage.getItem('sharptracker_history') || '{}');
+  requestCount = parseInt(localStorage.getItem('sharptracker_requests') || '0');
+  updateRequestCount(0);
+  if (!apiKey) {
+    document.getElementById('setup-screen').style.display = 'block';
+  } else {
+    showApp();
+  }
+}
+
+function saveKey() {
+  var key = document.getElementById('api-key-input').value.trim();
+  if (!key) { alert('Please enter your API key.'); return; }
+  apiKey = key;
+  localStorage.setItem('sharptracker_apikey', key);
+  showApp();
+}
+
+function showApp() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app-content').style.display = 'block';
+  document.getElementById('metrics-row').style.display = 'grid';
+  setStatus('connecting', 'Connecting...');
+  refreshGames();
+  refreshTimer = setInterval(refreshGames, 300000);
+}
+
+function showSettings() {
+  var key = prompt('Enter your OddsPapi API key (leave blank to keep current):', '');
+  if (key !== null && key.trim()) {
+    apiKey = key.trim();
+    localStorage.setItem('sharptracker_apikey', apiKey);
+    refreshGames();
+  }
+}
+
+function setStatus(state, text) {
+  var dot = document.getElementById('status-dot');
+  var txt = document.getElementById('status-text');
+  dot.className = 'status-dot' + (state === 'connected' ? ' connected' : state === 'error' ? ' error' : '');
+  txt.textContent = text;
+}
+
+function updateRequestCount(n) {
+  requestCount += n;
+  localStorage.setItem('sharptracker_requests', requestCount);
+  document.getElementById('m-requests').textContent = requestCount;
+}
+
+function getSelectedBooks() {
+  var books = [];
+  ['pinnacle','draftkings','fanduel','betmgm','singbet'].forEach(function(b) {
+    var el = document.getElementById('book-'+b);
+    if (el && el.checked) books.push(b);
+  });
+  return books;
+}
+
+function fmtAmerican(decimal) {
+  if (!decimal || isNaN(decimal)) return '—';
+  if (decimal >= 2) { return '+' + Math.round((decimal - 1) * 100); }
+  else { return Math.round(-100 / (decimal - 1)).toString(); }
+}
+
+function decimalToAmerican(d) { return fmtAmerican(parseFloat(d)); }
+
+function onSportChange() {
+  currentSportId = parseInt(document.getElementById('sport-select').value);
+  document.getElementById('games-sport-label').textContent = SPORT_IDS[currentSportId] || '';
+  selectedGame = null;
+  delete TOURNAMENT_CACHE[currentSportId];
+  document.getElementById('game-detail').style.display = 'none';
+  refreshGames();
+}
+
+async function getTournamentIds(sportId) {
+  if (TOURNAMENT_CACHE[sportId]) return TOURNAMENT_CACHE[sportId];
+  var url = API_BASE + '/tournaments?sportId=' + sportId + '&apiKey=' + apiKey;
+  var res = await fetch(url);
+  if (!res.ok) throw new Error('API error ' + res.status);
+  var data = await res.json();
+  updateRequestCount(1);
+  var tournaments = Array.isArray(data) ? data : [];
+  var withUpcoming = tournaments.filter(function(t){ return (t.upcomingFixtures||0) > 0 || (t.liveFixtures||0) > 0; });
+  var top = (withUpcoming.length ? withUpcoming : tournaments).slice(0, 5);
+  var ids = top.map(function(t){ return t.tournamentId; });
+  if (!ids.length && tournaments.length) ids = tournaments.slice(0,3).map(function(t){return t.tournamentId;});
+  TOURNAMENT_CACHE[sportId] = ids;
+  return ids;
+}
+
+async function refreshGames() {
+  var books = getSelectedBooks();
+  if (!books.length) { setStatus('error', 'Select at least one book'); return; }
+  document.getElementById('games-list').innerHTML = '<div class="loading">Discovering tournaments...</div>';
+  try {
+    var tournamentIds = await getTournamentIds(currentSportId);
+    if (!tournamentIds.length) throw new Error('No tournaments found for this sport right now.');
+    var bookParam = books[0];
+    var url = API_BASE + '/odds-by-tournaments?tournamentIds=' + tournamentIds.join(',') + '&bookmaker=' + bookParam + '&oddsFormat=decimal&apiKey=' + apiKey;
+    document.getElementById('games-list').innerHTML = '<div class="loading">Fetching live lines from ' + books.map(function(b){return BOOK_LABELS[b]||b;}).join(', ') + '...</div>';
+    var res = await fetch(url);
+    if (!res.ok) {
+      var errBody = await res.json().catch(function(){return {};});
+      throw new Error(errBody.message || errBody.error || 'API error ' + res.status);
+    }
+    var data = await res.json();
+    updateRequestCount(1);
+    setStatus('connected', 'Connected — ' + new Date().toLocaleTimeString());
+    document.getElementById('m-refresh').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    var rawGames = Array.isArray(data) ? data : [];
+    if (books.length > 1) {
+      for (var i = 1; i < books.length; i++) {
+        try {
+          var url2 = API_BASE + '/odds-by-tournaments?tournamentIds=' + tournamentIds.join(',') + '&bookmaker=' + books[i] + '&oddsFormat=decimal&apiKey=' + apiKey;
+          var res2 = await fetch(url2);
+          if (res2.ok) {
+            var data2 = await res2.json();
+            updateRequestCount(1);
+            if (Array.isArray(data2)) {
+              data2.forEach(function(g2) {
+                var existing = rawGames.find(function(g){return g.fixtureId === g2.fixtureId;});
+                if (existing && g2.bookmakerOdds) {
+                  Object.assign(existing.bookmakerOdds, g2.bookmakerOdds);
+                } else if (g2.hasOdds) {
+                  rawGames.push(g2);
+                }
+              });
+            }
+          }
+        } catch(e2) {}
+      }
+    }
+    games = rawGames.filter(function(g){return g.hasOdds;});
+    logHistorySnapshot();
+    renderGames();
+    if (selectedGame) {
+      var updated = games.find(function(g){return g.fixtureId === selectedGame.fixtureId;});
+      if (updated) { selectedGame = updated; renderDetail(); }
+    }
+    updateMetrics();
+  } catch(e) {
+    setStatus('error', 'Error: ' + e.message);
+    document.getElementById('games-list').innerHTML = '<div class="empty"><div class="empty-title">Could not load games</div><div class="empty-desc">' + e.message + '<br><br>Make sure your OddsPapi API key is correct. Click Settings to re-enter it.</div></div>';
+  }
+}
+
+function logHistorySnapshot() {
+  var now = new Date().toISOString();
+  games.forEach(function(game) {
+    var id = game.fixtureId;
+    if (!history[id]) history[id] = [];
+    var books = game.bookmakerOdds || {};
+    var snap = { time: now, odds: {} };
+    Object.keys(books).forEach(function(bk) {
+      var markets = books[bk].markets || {};
+      var m101 = markets['101'];
+      if (m101) {
+        var outcomes = m101.outcomes || {};
+        var vals = Object.values(outcomes).map(function(o){ return o.players && o.players['0'] ? o.players['0'].price : null; }).filter(Boolean);
+        if (vals.length >= 2) { snap.odds[bk] = { home: vals[0], away: vals[1] }; }
+      }
+    });
+    if (Object.keys(snap.odds).length > 0) {
+      var last = history[id][history[id].length - 1];
+      var changed = !last || JSON.stringify(last.odds) !== JSON.stringify(snap.odds);
+      if (changed) history[id].push(snap);
+      if (history[id].length > 50) history[id] = history[id].slice(-50);
+    }
+  });
+  localStorage.setItem('sharptracker_history', JSON.stringify(history));
+}
+
+function getGameTeams(game) {
+  var odds = game.bookmakerOdds || {};
+  var books = Object.keys(odds);
+  for (var i = 0; i < books.length; i++) {
+    var bk = odds[books[i]];
+    if (bk.participant1Name && bk.participant2Name) {
+      return { home: bk.participant1Name, away: bk.participant2Name };
+    }
+  }
+  if (game.participant1Name) return { home: game.participant1Name, away: game.participant2Name };
+  return { home: 'Home', away: 'Away' };
+}
+
+function getSharpGap(game) {
+  var books = game.bookmakerOdds || {};
+  var pinnacle = books['pinnacle'];
+  if (!pinnacle) return null;
+  var pm = pinnacle.markets && pinnacle.markets['101'];
+  if (!pm) return null;
+  var pVals = Object.values(pm.outcomes || {}).map(function(o){ return o.players && o.players['0'] ? o.players['0'].price : null; }).filter(Boolean);
+  if (pVals.length < 2) return null;
+  var softBooks = ['draftkings','fanduel','betmgm'];
+  var maxGap = 0;
+  softBooks.forEach(function(sb) {
+    var sbData = books[sb];
+    if (!sbData) return;
+    var sbm = sbData.markets && sbData.markets['101'];
+    if (!sbm) return;
+    var sVals = Object.values(sbm.outcomes || {}).map(function(o){ return o.players && o.players['0'] ? o.players['0'].price : null; }).filter(Boolean);
+    if (sVals.length < 2) return;
+    var gap = Math.abs(parseFloat(fmtAmerican(pVals[0])) - parseFloat(fmtAmerican(sVals[0])));
+    if (gap > maxGap) maxGap = gap;
+  });
+  return maxGap;
+}
+
+function detectSignal(game) {
+  var gap = getSharpGap(game);
+  if (gap === null) return 'neutral';
+  if (gap >= 10) return 'sharp';
+  if (gap >= 5) return 'watch';
+  return 'neutral';
+}
+
+function renderGames() {
+  var el = document.getElementById('games-list');
+  if (!games.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-title">No games found</div><div class="empty-desc">No upcoming games with odds available for this sport right now.</div></div>';
+    return;
+  }
+  var html = '';
+  var signals = 0;
+  games.forEach(function(game) {
+    var teams = getGameTeams(game);
+    var sig = detectSignal(game);
+    if (sig === 'sharp') signals++;
+    var startTime = new Date(game.startTime).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    var isActive = selectedGame && selectedGame.fixtureId === game.fixtureId;
+    var tagHtml = sig === 'sharp' ? '<span class="tag tag-sharp">Sharp signal</span>' :
+                  sig === 'watch' ? '<span class="tag tag-watch">Watch</span>' :
+                  '<span class="tag tag-neutral">Stable</span>';
+    html += '<div class="game-item' + (isActive?' active':'') + '" onclick="selectGame(\'' + game.fixtureId + '\')">'
+      + '<div><div class="game-teams">' + teams.away + ' @ ' + teams.home + '</div>'
+      + '<div class="game-meta">' + startTime + ' · ' + Object.keys(game.bookmakerOdds||{}).length + ' books</div></div>'
+      + '<div class="game-signal">' + tagHtml + '</div></div>';
+  });
+  el.innerHTML = html;
+  document.getElementById('m-games').textContent = games.length;
+  document.getElementById('m-signals').textContent = signals;
+  renderSignalsPanel(signals);
+}
+
+function renderSignalsPanel(signals) {
+  var el = document.getElementById('signals-panel');
+  var sharpGames = games.filter(function(g){ return detectSignal(g) === 'sharp'; });
+  if (!sharpGames.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-title">No sharp signals yet</div><div class="empty-desc">Will flag when Pinnacle diverges 10+ points from soft books.</div></div>';
+    return;
+  }
+  var html = '';
+  sharpGames.forEach(function(game) {
+    var teams = getGameTeams(game);
+    var gap = getSharpGap(game);
+    html += '<div class="game-item" onclick="selectGame(\'' + game.fixtureId + '\')" style="padding:0.75rem 1.25rem;">'
+      + '<div><div class="game-teams" style="font-size:12px;">' + teams.away + ' @ ' + teams.home + '</div>'
+      + '<div class="game-meta">Pinnacle gap: ' + Math.round(gap) + ' pts</div></div>'
+      + '<span class="tag tag-sharp">Sharp</span></div>';
+  });
+  el.innerHTML = html;
+}
+
+function selectGame(fixtureId) {
+  selectedGame = games.find(function(g){ return g.fixtureId === fixtureId; });
+  if (!selectedGame) return;
+  renderGames();
+  renderDetail();
+  document.getElementById('game-detail').style.display = 'block';
+  renderHistoryPanel();
+}
+
+function renderDetail() {
+  if (!selectedGame) return;
+  var teams = getGameTeams(selectedGame);
+  var startTime = new Date(selectedGame.startTime).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  document.getElementById('detail-title').textContent = teams.away + ' @ ' + teams.home;
+  document.getElementById('detail-time').textContent = startTime + ' · ' + (SPORT_IDS[currentSportId] || '');
+  var sig = detectSignal(selectedGame);
+  var sigTag = sig === 'sharp' ? '<span class="tag tag-sharp">Sharp signal detected</span>' :
+               sig === 'watch' ? '<span class="tag tag-watch">Watch — line diverging</span>' :
+               '<span class="tag tag-neutral">Stable</span>';
+  document.getElementById('detail-signal-tag').innerHTML = sigTag;
+  renderSignalBox(sig);
+  renderBookComparison();
+  renderGapAnalysis();
+  renderMovementChart();
+}
+
+function renderSignalBox(sig) {
+  var el = document.getElementById('signal-box-detail');
+  var gap = getSharpGap(selectedGame);
+  if (sig === 'sharp') {
+    el.className = 'signal-box sharp';
+    el.style.display = 'block';
+    el.innerHTML = '<strong>Sharp signal:</strong> Pinnacle is ' + (gap ? Math.round(gap) + ' points' : '') + ' off the soft book price. Sharp money may be influencing the Pinnacle line. Compare the direction of movement to confirm.';
+  } else if (sig === 'watch') {
+    el.className = 'signal-box watch';
+    el.style.display = 'block';
+    el.innerHTML = '<strong>Watch this line:</strong> Pinnacle is starting to diverge from recreational books. Keep refreshing to see if the gap widens.';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function renderBookComparison() {
+  var el = document.getElementById('book-comparison');
+  var books = selectedGame.bookmakerOdds || {};
+  var selectedBooks = getSelectedBooks();
+  var teams = getGameTeams(selectedGame);
+  var html = '';
+  selectedBooks.forEach(function(bk) {
+    var bkData = books[bk];
+    if (!bkData) return;
+    var markets = bkData.markets || {};
+    var m101 = markets['101'];
+    if (!m101) return;
+    var outcomes = Object.values(m101.outcomes || {});
+    var homePrice = outcomes[0] && outcomes[0].players && outcomes[0].players['0'] ? outcomes[0].players['0'].price : null;
+    var awayPrice = outcomes[1] && outcomes[1].players && outcomes[1].players['0'] ? outcomes[1].players['0'].price : null;
+    var isSharp = bk === 'pinnacle' || bk === 'singbet';
+    var color = BOOK_COLORS[bk] || '#888';
+    html += '<div class="book-row">'
+      + '<div class="book-name"><div class="book-dot" style="background:' + color + '"></div>'
+      + (BOOK_LABELS[bk]||bk) + (isSharp ? ' <span class="tag tag-sharp-book" style="font-size:10px;padding:1px 5px;">sharp</span>' : '') + '</div>'
+      + '<div class="book-odds">'
+      + '<div class="book-odd"><div class="book-odd-val">' + (homePrice ? fmtAmerican(homePrice) : '—') + '</div><div class="book-odd-lbl">' + teams.home.split(' ').pop() + '</div></div>'
+      + '<div class="book-odd"><div class="book-odd-val">' + (awayPrice ? fmtAmerican(awayPrice) : '—') + '</div><div class="book-odd-lbl">' + teams.away.split(' ').pop() + '</div></div>'
+      + '</div></div>';
+  });
+  el.innerHTML = html || '<div style="color:var(--hint);font-size:13px;padding:0.5rem 0;">No moneyline odds available.</div>';
+}
+
+function renderGapAnalysis() {
+  var el = document.getElementById('gap-analysis');
+  var books = selectedGame.bookmakerOdds || {};
+  var pinnacle = books['pinnacle'];
+  if (!pinnacle) { el.innerHTML = '<div style="color:var(--hint);font-size:13px;">Pinnacle not selected — enable it to see gap analysis.</div>'; return; }
+  var pm = pinnacle.markets && pinnacle.markets['101'];
+  if (!pm) { el.innerHTML = '<div style="color:var(--hint);font-size:13px;">Pinnacle moneyline not available.</div>'; return; }
+  var pVals = Object.values(pm.outcomes || {}).map(function(o){ return o.players && o.players['0'] ? o.players['0'].price : null; }).filter(Boolean);
+  if (pVals.length < 2) { el.innerHTML = ''; return; }
+  var pHome = parseFloat(fmtAmerican(pVals[0]));
+  var softBooks = ['draftkings','fanduel','betmgm'];
+  var html = '';
+  softBooks.forEach(function(sb) {
+    var sbData = books[sb];
+    if (!sbData) return;
+    var sbm = sbData.markets && sbData.markets['101'];
+    if (!sbm) return;
+    var sVals = Object.values(sbm.outcomes || {}).map(function(o){ return o.players && o.players['0'] ? o.players['0'].price : null; }).filter(Boolean);
+    if (sVals.length < 2) return;
+    var sHome = parseFloat(fmtAmerican(sVals[0]));
+    var gap = Math.round(Math.abs(pHome - sHome));
+    var direction = pHome < sHome ? 'Pinnacle favors home more' : 'Pinnacle favors away more';
+    var gapClass = gap >= 10 ? 'tag-sharp' : gap >= 5 ? 'tag-watch' : 'tag-neutral';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border);">'
+      + '<span style="font-size:13px;">Pinnacle vs ' + (BOOK_LABELS[sb]||sb) + '</span>'
+      + '<div style="display:flex;align-items:center;gap:0.5rem;">'
+      + '<span style="font-size:12px;color:var(--muted);">' + direction + '</span>'
+      + '<span class="tag ' + gapClass + '">' + gap + ' pt gap</span>'
+      + '</div></div>';
+  });
+  el.innerHTML = html || '<div style="color:var(--hint);font-size:13px;">Enable soft books (DraftKings, FanDuel) to see gap analysis.</div>';
+}
+
+function renderMovementChart() {
+  var id = selectedGame.fixtureId;
+  var snapshots = history[id] || [];
+  var el = document.getElementById('movement-chart');
+  if (chart) { chart.destroy(); chart = null; }
+  if (snapshots.length < 2) {
+    document.getElementById('chart-legend').innerHTML = '<span style="font-size:12px;color:var(--muted);">Waiting for more data points — chart will appear after the next refresh.</span>';
+    return;
+  }
+  var labels = snapshots.map(function(s){ return new Date(s.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); });
+  var datasets = [];
+  var usedBooks = new Set();
+  snapshots.forEach(function(s){ Object.keys(s.odds).forEach(function(b){ usedBooks.add(b); }); });
+  var legendHtml = '';
+  usedBooks.forEach(function(bk) {
+    var color = BOOK_COLORS[bk] || '#888';
+    var data = snapshots.map(function(s){ return s.odds[bk] ? parseFloat(fmtAmerican(s.odds[bk].home)) : null; });
+    datasets.push({ label: BOOK_LABELS[bk]||bk, data: data, borderColor: color, backgroundColor: 'transparent', borderWidth: bk === 'pinnacle' ? 2.5 : 1.5, borderDash: bk === 'pinnacle' ? [] : [4,3], pointRadius: 3, pointBackgroundColor: color, tension: 0.3, spanGaps: true });
+    legendHtml += '<div class="legend-item"><div class="legend-dot" style="background:' + color + ';' + (bk!=='pinnacle'?'border:1px dashed '+color+';background:transparent;':'') + '"></div>' + (BOOK_LABELS[bk]||bk) + (bk==='pinnacle'?' (sharp)':'') + '</div>';
+  });
+  document.getElementById('chart-legend').innerHTML = legendHtml;
+  var isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+  var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  var tickColor = '#9c9a92';
+  chart = new Chart(el, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(ctx){ return ctx.dataset.label + ': ' + (ctx.parsed.y > 0 ? '+' : '') + ctx.parsed.y; } } } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 }, maxRotation: 0 }, border: { display: false } },
+        y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 }, callback: function(v){ return (v>0?'+':'')+v; } }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function renderHistoryPanel() {
+  if (!selectedGame) return;
+  var id = selectedGame.fixtureId;
+  var snapshots = (history[id] || []).slice().reverse();
+  var el = document.getElementById('history-panel');
+  if (!snapshots.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-title">No history yet</div><div class="empty-desc">Lines will be logged automatically every refresh.</div></div>';
+    return;
+  }
+  var books = getSelectedBooks();
+  var html = '<div style="overflow-x:auto;"><table class="history-table"><thead><tr><th>Time</th>';
+  books.forEach(function(bk){ html += '<th>' + (BOOK_LABELS[bk]||bk) + '</th>'; });
+  html += '</tr></thead><tbody>';
+  snapshots.slice(0,20).forEach(function(snap) {
+    html += '<tr><td style="color:var(--muted);">' + new Date(snap.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>';
+    books.forEach(function(bk) {
+      var odds = snap.odds[bk];
+      html += '<td>' + (odds ? fmtAmerican(odds.home) + ' / ' + fmtAmerican(odds.away) : '—') + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function updateMetrics() {
+  var signals = games.filter(function(g){ return detectSignal(g) === 'sharp'; }).length;
+  document.getElementById('m-signals').textContent = signals;
+  document.getElementById('m-games').textContent = games.length;
+}
+
+function clearHistory() {
+  if (!confirm('Clear all saved line history?')) return;
+  history = {};
+  localStorage.removeItem('sharptracker_history');
+  if (selectedGame) { renderHistoryPanel(); renderMovementChart(); }
+}
+
+window.onload = init;
+</script>
+
+</body>
+</html>
