@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SharpLine — Sharp Book Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0f0f11;
+  --surface: #18181c;
+  --surface2: #1f1f24;
+  --surface3: #26262d;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #f0eee8;
+  --muted: #9c9a92;
+  --hint: #5a5a56;
+  --accent: #378ADD;
+  --accent2: #2a6db5;
+  --green: #4caf50;
+  --green-bg: rgba(76,175,80,0.12);
+  --green-border: rgba(76,175,80,0.3);
+  --red: #ef5350;
+  --red-bg: rgba(239,83,80,0.12);
+  --red-border: rgba(239,83,80,0.3);
+  --amber: #ffa726;
+  --amber-bg: rgba(255,167,38,0.12);
+  --amber-border: rgba(255,167,38,0.3);
+  --radius: 8px; --radius-lg: 12px; --radius-xl: 16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:4px;}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-size:17px;font-weight:700;letter-spacing:-0.03em;}
+.logo span{color:var(--accent);}
+.header-right{display:flex;align-items:center;gap:0.75rem;}
+.status-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:12px;color:var(--muted);}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--hint);flex-shrink:0;}
+.status-dot.connected{background:var(--green);box-shadow:0 0 6px var(--green);}
+.status-dot.error{background:var(--red);}
+.status-dot.loading{background:var(--amber);animation:pulse 1s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.btn{height:34px;padding:0 14px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn:hover{background:var(--surface3);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn.primary:hover{background:var(--accent2);border-color:var(--accent2);}
+.btn.sm{height:28px;padding:0 10px;font-size:12px;}
+.btn.danger{border-color:var(--red-border);color:var(--red);}
+.btn.danger:hover{background:var(--red-bg);}
+input[type=text],input[type=password],select{height:36px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;padding:0 12px;outline:none;transition:border-color 0.15s;width:100%;}
+input[type=text]:focus,input[type=password]:focus,select:focus{border-color:var(--accent);}
+select option{background:var(--surface2);}
+main{max-width:1140px;margin:0 auto;padding:1.25rem 1.5rem;}
+.setup-screen{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:2rem;}
+.setup-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-xl);padding:2.5rem;width:100%;max-width:440px;text-align:center;}
+.setup-logo{font-size:48px;margin-bottom:1rem;}
+.setup-card h2{font-size:22px;font-weight:700;margin-bottom:0.5rem;letter-spacing:-0.02em;}
+.setup-card p{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:1.5rem;}
+.setup-card a{color:var(--accent);text-decoration:none;}
+.setup-card a:hover{text-decoration:underline;}
+.setup-field{text-align:left;margin-bottom:1rem;}
+.setup-field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+.setup-note{font-size:12px;color:var(--hint);margin-top:1rem;}
+.toolbar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.875rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;}
+.toolbar-field{display:flex;flex-direction:column;gap:5px;}
+.toolbar-field label{font-size:10px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;}
+.toolbar-divider{width:1px;height:32px;background:var(--border);flex-shrink:0;}
+.book-checks{display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;}
+.book-check{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;}
+.book-check input{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;}
+.book-check span{font-size:12px;font-weight:500;color:var(--muted);}
+.book-check input:checked + span{color:var(--text);}
+.toolbar-actions{margin-left:auto;display:flex;gap:0.5rem;}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.875rem;margin-bottom:1.25rem;}
+@media(max-width:800px){.metrics-grid{grid-template-columns:repeat(2,1fr);}}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;position:relative;overflow:hidden;}
+.metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:0.5;}
+.metric-card.green::before{background:var(--green);}
+.metric-card.amber::before{background:var(--amber);}
+.metric-card.red::before{background:var(--red);}
+.metric-label{font-size:10px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+.metric-value{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-0.02em;line-height:1;}
+.metric-sub{font-size:11px;color:var(--hint);margin-top:4px;}
+.main-grid{display:grid;grid-template-columns:300px 1fr;gap:1.25rem;align-items:start;}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem;}
+.panel-header{padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.panel-title{font-size:13px;font-weight:600;color:var(--text);}
+.panel-meta{font-size:11px;color:var(--hint);}
+.panel-body{padding:1.25rem;}
+.game-item{padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;}
+.game-item:last-child{border-bottom:none;}
+.game-item:hover{background:var(--surface2);}
+.game-item.active{background:rgba(55,138,221,0.08);border-left:2px solid var(--accent);}
+.game-teams{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px;}
+.game-meta{font-size:11px;color:var(--hint);}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;border:1px solid transparent;white-space:nowrap;}
+.tag-sharp{background:var(--green-bg);color:var(--green);border-color:var(--green-border);}
+.tag-watch{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border);}
+.tag-neutral{background:var(--surface3);color:var(--hint);border-color:var(--border);}
+.tag-black{background:var(--text);color:var(--bg);font-size:10px;padding:2px 6px;border-radius:4px;}
+.signal-banner{border-radius:var(--radius);padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;border:1px solid transparent;display:flex;align-items:flex-start;gap:0.625rem;}
+.signal-banner.sharp{background:var(--green-bg);border-color:var(--green-border);color:#81c784;}
+.signal-banner.watch{background:var(--amber-bg);border-color:var(--amber-border);color:#ffb74d;}
+.book-row{display:flex;align-items:center;padding:0.75rem 0;border-bottom:1px solid var(--border);gap:0.75rem;}
+.book-row:last-child{border-bottom:none;}
+.book-indicator{width:3px;height:36px;border-radius:2px;flex-shrink:0;}
+.book-name-col{flex:1;}
+.book-name{font-size:13px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:6px;}
+.book-type{font-size:10px;color:var(--hint);margin-top:2px;}
+.book-odds-col{display:flex;gap:1.5rem;}
+.book-odd{text-align:right;}
+.book-odd-val{font-size:16px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+.book-odd-lbl{font-size:10px;color:var(--hint);margin-top:1px;}
+.gap-row{padding:0.625rem 0;border-bottom:1px solid var(--border);}
+.gap-row:last-child{border-bottom:none;}
+.gap-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.gap-label{font-size:12px;color:var(--muted);}
+.gap-bar-wrap{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;}
+.gap-bar{height:100%;border-radius:2px;transition:width 0.5s ease;}
+.gap-bar.sharp{background:var(--green);}
+.gap-bar.watch{background:var(--amber);}
+.gap-bar.neutral{background:var(--hint);}
+.chart-wrap{position:relative;height:240px;}
+.chart-legend{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+.legend-dot{width:12px;height:3px;border-radius:2px;flex-shrink:0;}
+.hist-table{width:100%;border-collapse:collapse;font-size:12px;}
+.hist-table th{padding:0.5rem 0.75rem;text-align:left;font-size:10px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border);background:var(--surface2);}
+.hist-table td{padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);color:var(--muted);font-variant-numeric:tabular-nums;}
+.hist-table tr:last-child td{border-bottom:none;}
+.hist-table tr:hover td{background:var(--surface2);color:var(--text);}
+.signal-card{padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
+.signal-card:last-child{border-bottom:none;}
+.signal-card:hover{background:var(--surface2);}
+.signal-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.signal-card-game{font-size:12px;font-weight:500;color:var(--text);}
+.signal-card-detail{font-size:11px;color:var(--hint);}
+.empty{text-align:center;padding:2.5rem 1rem;}
+.empty-icon{font-size:24px;margin-bottom:0.75rem;opacity:0.3;}
+.empty-title{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:0.375rem;}
+.empty-desc{font-size:12px;color:var(--hint);line-height:1.5;}
+.loading{text-align:center;padding:2rem;color:var(--hint);font-size:13px;}
+.section-label{font-size:10px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.625rem;margin-top:1.25rem;}
+.section-label:first-child{margin-top:0;}
+.quota-bar-wrap{height:3px;background:var(--surface3);border-radius:2px;margin-top:6px;overflow:hidden;}
+.quota-bar{height:100%;border-radius:2px;background:var(--green);transition:width 0.4s,background 0.4s;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Sharp<span>Line</span></div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Not connected</span>
+    </div>
+    <button class="btn sm" onclick="showSettings()">Settings</button>
+  </div>
+</header>
+
+<div id="setup-screen" style="display:none;">
+  <div class="setup-screen">
+    <div class="setup-card">
+      <div class="setup-logo">📈</div>
+      <h2>Connect to OddsPapi</h2>
+      <p>Get your free API key at <a href="https://oddspapi.io" target="_blank">oddspapi.io</a> — no credit card needed. Includes Pinnacle, DraftKings, FanDuel, and 350+ books.</p>
+      <div class="setup-field">
+        <label>API Key</label>
+        <input type="password" id="api-key-input" placeholder="Paste your OddsPapi API key">
+      </div>
+      <button class="btn primary" onclick="saveKey()" style="width:100%;height:40px;font-size:14px;">Connect →</button>
+      <p class="setup-note">Your key is stored locally in your browser only.</p>
+    </div>
+  </div>
+</div>
+
+<main id="app-content" style="display:none;">
+
+  <div class="toolbar">
+    <div class="toolbar-field">
+      <label>Sport</label>
+      <select id="sport-select" onchange="onSportChange()" style="width:170px;">
+        <option value="13">MLB — Baseball</option>
+        <option value="11">NBA — Basketball</option>
+        <option value="14">NFL — Football</option>
+        <option value="15">NHL — Hockey</option>
+      </select>
+    </div>
+    <div class="toolbar-divider"></div>
+    <div class="toolbar-field">
+      <label>Books to compare</label>
+      <div class="book-checks">
+        <label class="book-check"><input type="checkbox" id="book-pinnacle" checked onchange="refreshGames()"><span style="color:#e63946;">Pinnacle</span></label>
+        <label class="book-check"><input type="checkbox" id="book-draftkings" onchange="refreshGames()"><span>DraftKings</span></label>
+        <label class="book-check"><input type="checkbox" id="book-fanduel" onchange="refreshGames()"><span>FanDuel</span></label>
+        <label class="book-check"><input type="checkbox" id="book-betmgm" onchange="refreshGames()"><span>BetMGM</span></label>
+        <label class="book-check"><input type="checkbox" id="book-singbet" onchange="refreshGames()"><span>Singbet</span></label>
+        <label class="book-check"><input type="checkbox" id="book-bovada.lv" checked onchange="refreshGames()"><span style="color:#f97316;">Bovada</span></label>
+      </div>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn sm primary" onclick="refreshGames()">↻ Refresh</button>
+      <button class="btn sm" onclick="resetQuota()">Reset quota</button>
+      <button class="btn sm danger" onclick="clearHistory()">Clear history</button>
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Games tracked</div>
+      <div class="metric-value" id="m-games">—</div>
+      <div class="metric-sub">this session</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-label">Sharp signals</div>
+      <div class="metric-value" id="m-signals">—</div>
+      <div class="metric-sub">Pinnacle gap 10+ pts</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Last refresh</div>
+      <div class="metric-value" id="m-refresh" style="font-size:18px;padding-top:4px;">—</div>
+      <div class="metric-sub">manual only</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="metric-label">API quota</div>
+      <div class="metric-value" id="m-requests">0 <span style="font-size:14px;font-weight:400;color:var(--hint);">/ 250</span></div>
+      <div class="quota-bar-wrap"><div class="quota-bar" id="quota-bar" style="width:100%"></div></div>
+      <div class="metric-sub" id="m-requests-sub">250 remaining</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Today's games</span>
+          <span class="panel-meta" id="games-sport-label">MLB</span>
+        </div>
+        <div id="games-list"><div class="loading">Loading</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Sharp signals</span>
+          <span class="panel-meta">≥ 10 pt gap</span>
+        </div>
+        <div id="signals-panel">
+          <div class="empty"><div class="empty-icon">◎</div><div class="empty-title">Scanning...</div><div class="empty-desc">Signals appear when Pinnacle diverges from soft books by 10+ points.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel" id="game-detail" style="display:none;">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" id="detail-title">—</div>
+            <div class="panel-meta" id="detail-time"></div>
+          </div>
+          <div id="detail-signal-tag"></div>
+        </div>
+        <div class="panel-body">
+          <div id="signal-banner-detail" style="display:none;"></div>
+          <div class="section-label">Live odds by book</div>
+          <div id="book-comparison"></div>
+          <div class="section-label">Sharp vs soft gap</div>
+          <div id="gap-analysis"></div>
+          <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.625rem;">
+            <span>Pinnacle full line history</span>
+            <button class="btn sm" id="hist-btn" onclick="loadHistoricalOdds()">Pull full history (1 request)</button>
+          </div>
+          <div id="historical-panel" style="margin-bottom:1rem;">
+            <div style="color:var(--hint);font-size:12px;padding:0.375rem 0;">Pull every Pinnacle line movement since this game opened — 1 API request.</div>
+          </div>
+          <div class="section-label">Session movement chart</div>
+          <div class="chart-legend" id="chart-legend"></div>
+          <div class="chart-wrap"><canvas id="movement-chart" role="img" aria-label="Line movement chart"></canvas></div>
+          <div class="section-label">Session log</div>
+          <div id="history-panel" style="overflow-x:auto;"></div>
+        </div>
+      </div>
+      <div class="panel" id="select-prompt" style="display:flex;align-items:center;justify-content:center;min-height:300px;">
+        <div class="empty"><div class="empty-icon">←</div><div class="empty-title">Select a game</div><div class="empty-desc">Click any game to see live odds, gap analysis, and line movement history.</div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+var API_BASE='https://api.oddspapi.io/v4';
+var apiKey='',currentSportId=13,games=[],selectedGame=null,history={},requestCount=0,chart=null,TOURNAMENT_CACHE={},PARTICIPANT_CACHE={};
+var BOOK_COLORS={pinnacle:'#e63946',draftkings:'#53d337',fanduel:'#1493ff',betmgm:'#c8a951',singbet:'#a78bfa','bovada.lv':'#f97316'};
+var BOOK_LABELS={pinnacle:'Pinnacle',draftkings:'DraftKings',fanduel:'FanDuel',betmgm:'BetMGM',singbet:'Singbet','bovada.lv':'Bovada'};
+var SPORT_IDS={13:'MLB',11:'NBA',14:'NFL',15:'NHL'};
+var TOURNAMENT_NAMES={};
+function getTournamentName(tournamentId){
+  return TOURNAMENT_NAMES[tournamentId]||(SPORT_IDS[currentSportId]||'League '+tournamentId);
+}
+
+function init(){
+  apiKey=localStorage.getItem('sharptracker_key')||'';
+  history=JSON.parse(localStorage.getItem('sharptracker_history')||'{}');
+  requestCount=parseInt(localStorage.getItem('sharptracker_requests')||'0');
+  updateQuota(0);
+  if(!apiKey){document.getElementById('setup-screen').style.display='block';}
+  else{showApp();}
+}
+
+function saveKey(){
+  var k=document.getElementById('api-key-input').value.trim();
+  if(!k){alert('Please enter your API key.');return;}
+  apiKey=k;localStorage.setItem('sharptracker_key',k);showApp();
+}
+
+function showApp(){
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('app-content').style.display='block';
+  setStatus('loading','Connecting...');
+  refreshGames();
+}
+
+function showSettings(){
+  var k=prompt('Enter your OddsPapi API key:','');
+  if(k!==null&&k.trim()){apiKey=k.trim();localStorage.setItem('sharptracker_key',apiKey);TOURNAMENT_CACHE={};refreshGames();}
+}
+
+function setStatus(state,text){
+  var dot=document.getElementById('status-dot');
+  dot.className='status-dot'+(state==='connected'?' connected':state==='error'?' error':state==='loading'?' loading':'');
+  document.getElementById('status-text').textContent=text;
+}
+
+function updateQuota(n){
+  requestCount+=n;
+  localStorage.setItem('sharptracker_requests',requestCount);
+  var remaining=Math.max(0,250-requestCount);
+  var pct=(remaining/250)*100;
+  var el=document.getElementById('m-requests');
+  var sub=document.getElementById('m-requests-sub');
+  var bar=document.getElementById('quota-bar');
+  var card=bar&&bar.closest('.metric-card');
+  if(el)el.innerHTML=requestCount+' <span style="font-size:14px;font-weight:400;color:var(--hint);">/ 250</span>';
+  if(bar){bar.style.width=pct+'%';bar.style.background=pct>50?'var(--green)':pct>20?'var(--amber)':'var(--red)';}
+  if(sub)sub.textContent=remaining+' remaining this month';
+  if(card)card.className='metric-card '+(pct>50?'green':pct>20?'amber':'red');
+}
+
+function resetQuota(){
+  if(!confirm('Reset quota counter? Only do this at start of new billing month.'))return;
+  requestCount=0;localStorage.setItem('sharptracker_requests',0);updateQuota(0);
+}
+
+function clearHistory(){
+  if(!confirm('Clear all saved line history?'))return;
+  history={};localStorage.removeItem('sharptracker_history');
+  if(selectedGame){renderHistoryPanel();renderMovementChart();}
+}
+
+function getSelectedBooks(){
+  return['pinnacle','draftkings','fanduel','betmgm','singbet','bovada.lv'].filter(function(b){
+    var el=document.getElementById('book-'+b);return el&&el.checked;
+  });
+}
+
+function fmtAmerican(decimal){
+  if(!decimal||isNaN(decimal))return'—';
+  var d=parseFloat(decimal);
+  if(d>=2)return'+'+(Math.round((d-1)*100));
+  return''+Math.round(-100/(d-1));
+}
+
+function onSportChange(){
+  currentSportId=parseInt(document.getElementById('sport-select').value);
+  document.getElementById('games-sport-label').textContent=SPORT_IDS[currentSportId]||'';
+  selectedGame=null;delete TOURNAMENT_CACHE[currentSportId];PARTICIPANT_CACHE={};
+  document.getElementById('game-detail').style.display='none';
+  document.getElementById('select-prompt').style.display='flex';
+  refreshGames();
+}
+
+async function fetchParticipantNames(games){
+  if(PARTICIPANT_CACHE[currentSportId+'_loaded'])return;
+  try{
+    var res=await fetch(API_BASE+'/participants?sportId='+currentSportId+'&language=en&apiKey='+apiKey);
+    if(!res.ok)return;
+    var data=await res.json();
+    updateQuota(1);
+    Object.keys(data).forEach(function(id){PARTICIPANT_CACHE[id]=data[id];});
+    PARTICIPANT_CACHE[currentSportId+'_loaded']=true;
+  }catch(e){console.log('participants error',e);}
+}
+
+async function getTournamentIds(sportId){
+  if(TOURNAMENT_CACHE[sportId])return TOURNAMENT_CACHE[sportId];
+  var res=await fetch(API_BASE+'/tournaments?sportId='+sportId+'&apiKey='+apiKey);
+  if(!res.ok)throw new Error('API error '+res.status);
+  var data=await res.json();updateQuota(1);
+  var t=Array.isArray(data)?data:[];
+  // Store all tournament names for display
+  t.forEach(function(x){if(x.tournamentId&&x.tournamentName)TOURNAMENT_NAMES[x.tournamentId]=x.tournamentName;});
+  var active=t.filter(function(x){return(x.upcomingFixtures||0)>0||(x.liveFixtures||0)>0;});
+  // For North American sports try to find the main league
+  var major=active.filter(function(x){
+    var n=(x.tournamentName||'').toLowerCase();
+    if(sportId===13)return n==='mlb'||n.indexOf('major league baseball')>-1;
+    if(sportId===11)return n==='nba'||n.indexOf('national basketball association')>-1;
+    if(sportId===14)return n==='nfl'||n.indexOf('national football league')>-1;
+    if(sportId===15)return n==='nhl'||n.indexOf('national hockey league')>-1;
+    return false;
+  });
+  var top=(major.length?major:active).slice(0,8);
+  var ids=top.map(function(x){return x.tournamentId;});
+  if(!ids.length&&t.length)ids=t.slice(0,3).map(function(x){return x.tournamentId;});
+  TOURNAMENT_CACHE[sportId]=ids;return ids;
+}
+
+async function refreshGames(){
+  var books=getSelectedBooks();
+  if(!books.length){setStatus('error','Select at least one book');return;}
+  if(requestCount>=250){
+    setStatus('error','Monthly quota reached');
+    document.getElementById('games-list').innerHTML='<div class="empty"><div class="empty-title">Monthly limit reached</div><div class="empty-desc">Upgrade at oddspapi.io or wait until next month.</div></div>';
+    return;
+  }
+  setStatus('loading','Fetching...');
+  document.getElementById('games-list').innerHTML='<div class="loading">Discovering tournaments</div>';
+  try{
+    var ids=await getTournamentIds(currentSportId);
+    if(!ids.length)throw new Error('No tournaments found right now.');
+    document.getElementById('games-list').innerHTML='<div class="loading">Fetching lines</div>';
+    var allGames={};
+    for(var i=0;i<books.length;i++){
+      var url=API_BASE+'/odds-by-tournaments?tournamentIds='+ids.join(',')+'&bookmaker='+books[i]+'&oddsFormat=decimal&apiKey='+apiKey;
+      var res=await fetch(url);
+      if(!res.ok){
+        var err=await res.json().catch(function(){return{};});
+        if(res.status===429)throw new Error('Rate limit hit — wait a few minutes.');
+        throw new Error(err.message||err.error||'API error '+res.status);
+      }
+      var data=await res.json();updateQuota(1);
+      if(Array.isArray(data)){
+        data.forEach(function(g){
+          if(!g.hasOdds)return;
+          if(!allGames[g.fixtureId]){allGames[g.fixtureId]=JSON.parse(JSON.stringify(g));if(!allGames[g.fixtureId].bookmakerOdds)allGames[g.fixtureId].bookmakerOdds={};}
+          else if(g.bookmakerOdds){Object.assign(allGames[g.fixtureId].bookmakerOdds,g.bookmakerOdds);}
+        });
+      }
+      if(i<books.length-1)await new Promise(function(r){setTimeout(r,800);});
+    }
+    var time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    setStatus('connected','Updated '+time);
+    document.getElementById('m-refresh').textContent=time;
+    games=Object.values(allGames);
+    await fetchParticipantNames(games);
+    logHistorySnapshot();renderGames();renderSignalsPanel();
+    if(selectedGame){
+      var updated=games.find(function(g){return g.fixtureId===selectedGame.fixtureId;});
+      if(updated){selectedGame=updated;renderDetail();}
+    }
+    document.getElementById('m-games').textContent=games.length;
+  }catch(e){
+    setStatus('error',e.message.length>40?'Error — check game panel':e.message);
+    document.getElementById('games-list').innerHTML='<div class="empty"><div class="empty-icon">✕</div><div class="empty-title">Could not load games</div><div class="empty-desc">'+e.message+'<br><br>Wait a few minutes and try again.</div></div>';
+  }
+}
+
+function logHistorySnapshot(){
+  var now=new Date().toISOString();
+  games.forEach(function(game){
+    var id=game.fixtureId;if(!history[id])history[id]=[];
+    var bks=game.bookmakerOdds||{};var snap={time:now,odds:{}};
+    Object.keys(bks).forEach(function(bk){
+      var vals=getMarketOdds(bks[bk],getMarketId(game));
+      if(vals&&vals.length>=2)snap.odds[bk]={home:vals[0],away:vals[1]};
+    });
+    if(Object.keys(snap.odds).length>0){
+      var last=history[id][history[id].length-1];
+      if(!last||JSON.stringify(last.odds)!==JSON.stringify(snap.odds))history[id].push(snap);
+      if(history[id].length>50)history[id]=history[id].slice(-50);
+    }
+  });
+  localStorage.setItem('sharptracker_history',JSON.stringify(history));
+}
+
+function getTeams(game){
+  var p1=game.participant1Id&&PARTICIPANT_CACHE[game.participant1Id];
+  var p2=game.participant2Id&&PARTICIPANT_CACHE[game.participant2Id];
+  if(p1&&p2)return{home:p1,away:p2};
+  if(game.participant1Name&&game.participant1Name!=='Home')return{home:game.participant1Name,away:game.participant2Name||'Away'};
+  var bks=game.bookmakerOdds||{};
+  for(var bk in bks){
+    var b=bks[bk];
+    if(b.participant1Name&&b.participant1Name!=='Home')return{home:b.participant1Name,away:b.participant2Name||'Away'};
+  }
+  return{home:'Team 1',away:'Team 2'};
+}
+
+function getMoneylineMarket(bookData){
+  if(!bookData||!bookData.markets)return null;
+  var markets=bookData.markets;
+  var best=null;
+  var bestScore=-1;
+  Object.keys(markets).forEach(function(mid){
+    var m=markets[mid];
+    if(!m||!m.marketActive)return;
+    var bmid=(m.bookmakerMarketId||'').toLowerCase();
+    // Explicit exclusions by name
+    if(bmid.indexOf('total')>-1||bmid.indexOf('teamtotal')>-1||bmid.indexOf('parlay')>-1||bmid.indexOf('spread')>-1||bmid.indexOf('runline')>-1||bmid.indexOf('handicap')>-1||bmid.indexOf('ou.')>-1||bmid.indexOf('o/u')>-1)return;
+    var ov=Object.values(m.outcomes||{});
+    var mainOv=ov.filter(function(o){return o.players&&o.players['0']&&o.players['0'].mainLine&&o.players['0'].active;});
+    if(mainOv.length!==2)return;
+    var p0=mainOv[0].players['0'].price;
+    var p1=mainOv[1].players['0'].price;
+    // Sanity: both prices must be realistic moneyline values
+    if(p0<1.01||p0>25||p1<1.01||p1>25)return;
+    // Score: prefer markets where prices sum closer to 2 (less vig) and mainLine=true
+    var score=mainOv[0].players['0'].mainLine?10:0;
+    // Prefer the market with fewest total outcomes (moneyline has exactly 2)
+    score+=ov.length===2?5:0;
+    // Prefer numeric-only bookmakerMarketId (Bovada style) or known moneyline keywords
+    if(bmid.indexOf('moneyline')>-1||bmid.indexOf('h2h')>-1||bmid.indexOf('1x2')===-1)score+=2;
+    if(score>bestScore){bestScore=score;best=mainOv;}
+  });
+  if(best)return best.map(function(o){return o.players['0'].price;});
+  return null;
+}
+
+function getMarketId(game){
+  // Keep for backward compat but not used for cross-book comparison
+  var bks=game.bookmakerOdds||{};
+  for(var bk in bks){
+    var markets=(bks[bk]&&bks[bk].markets)||{};
+    if(Object.keys(markets).length>0)return Object.keys(markets)[0];
+  }
+  return'101';
+}
+
+function getMarketOdds(bookData,marketId){
+  // Use smart moneyline detection instead of market ID matching
+  return getMoneylineMarket(bookData);
+}
+
+function getSharpGap(game){
+  var bks=game.bookmakerOdds||{};var pin=bks['pinnacle'];if(!pin)return null;
+  var pVals=getMoneylineMarket(pin);if(!pVals)return null;
+  var pH=parseFloat(fmtAmerican(pVals[0]));var maxGap=0;
+  ['draftkings','fanduel','betmgm','bovada.lv'].forEach(function(sb){
+    if(!bks[sb])return; // book not present for this game - skip
+    var sVals=getMoneylineMarket(bks[sb]);if(!sVals)return;
+    var sH=parseFloat(fmtAmerican(sVals[0]));
+    // Sanity check: if both teams are heavy favorites something is wrong
+    if(pH<-800||sH<-800)return;
+    var gap=Math.abs(pH-sH);
+    // Cap gap at 50 - anything higher is a bad market match
+    if(gap>50)return;
+    if(gap>maxGap)maxGap=gap;
+  });
+  return maxGap;
+}
+
+function detectSignal(game){
+  var gap=getSharpGap(game);if(gap===null)return'neutral';if(gap>=10)return'sharp';if(gap>=5)return'watch';return'neutral';
+}
+
+function renderGames(){
+  var el=document.getElementById('games-list');
+  if(!games.length){el.innerHTML='<div class="empty"><div class="empty-icon">○</div><div class="empty-title">No games found</div><div class="empty-desc">No upcoming games with odds right now.</div></div>';return;}
+  var today=new Date();today.setHours(0,0,0,0);
+  var tomorrow=new Date(today.getTime()+2*24*60*60*1000);
+  var filtered=games.filter(function(g){
+    var t=new Date(g.startTime);return t>=today&&t<tomorrow;
+  });
+  if(!filtered.length)filtered=games.slice();
+  filtered.sort(function(a,b){return new Date(a.startTime)-new Date(b.startTime);});
+  var sigOrder={'sharp':0,'watch':1,'neutral':2};
+  // Group by tournament, sharp signals first within each group
+  var groups={};
+  filtered.forEach(function(game){
+    var tid=game.tournamentId||0;
+    if(!groups[tid])groups[tid]=[];
+    groups[tid].push(game);
+  });
+  var tids=Object.keys(groups).sort(function(a,b){
+    var an=groups[a].filter(function(g){return detectSignal(g)!=='neutral';}).length;
+    var bn=groups[b].filter(function(g){return detectSignal(g)!=='neutral';}).length;
+    if(bn!==an)return bn-an;
+    return parseInt(a)-parseInt(b);
+  });
+  var html='';
+  tids.forEach(function(tid){
+    var groupGames=groups[tid];
+    groupGames.sort(function(a,b){
+      var sigOrder={'sharp':0,'watch':1,'neutral':2};
+      var sd=sigOrder[detectSignal(a)]-sigOrder[detectSignal(b)];
+      if(sd!==0)return sd;
+      return new Date(a.startTime)-new Date(b.startTime);
+    });
+    var tname=getTournamentName(parseInt(tid));
+    html+='<div style="padding:0.35rem 1rem 0.25rem;font-size:10px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;background:var(--surface2);border-bottom:1px solid var(--border);">'+tname+'</div>';
+    groupGames.forEach(function(game){
+      var teams=getTeams(game);var sig=detectSignal(game);
+      var pin=game.bookmakerOdds&&game.bookmakerOdds['pinnacle'];
+      var ml='';var spread='';var total='';
+      if(pin){
+        var mlVals=getMoneylineMarket(pin);
+        if(mlVals&&mlVals.length>=2)ml=fmtAmerican(mlVals[0]);
+        var spd=getSpreadLine(pin);if(spd)spread=spd.hdp;
+        var tot=getTotalLine(pin);if(tot)total='o'+tot.pts;
+      }
+      var time=new Date(game.startTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      var isActive=selectedGame&&selectedGame.fixtureId===game.fixtureId;
+      var tagHtml=sig==='sharp'?'<span class="tag tag-sharp">Sharp</span>':sig==='watch'?'<span class="tag tag-watch">Watch</span>':'<span class="tag tag-neutral">Stable</span>';
+      var oddsHtml=(ml||spread||total)?'<div style="display:flex;gap:8px;margin-top:3px;font-size:11px;color:var(--hint);">'
+        +(ml?'<span>ML: <span style="color:var(--muted);">'+ml+'</span></span>':'')
+        +(spread?'<span>Spd: <span style="color:var(--muted);">'+spread+'</span></span>':'')
+        +(total?'<span>'+total+'</span>':'')
+        +'</div>':'';
+      html+='<div class="game-item'+(isActive?' active':'')+'" data-id="'+game.fixtureId+'" onclick="selectGame(this.dataset.id)">'
+        +'<div style="flex:1;min-width:0;"><div class="game-teams">'+teams.away+' @ '+teams.home+'</div>'
+        +'<div class="game-meta">'+time+'</div>'+oddsHtml+'</div>'
+        +tagHtml+'</div>';
+    });
+  });
+  el.innerHTML=html;
+}
+
+function renderSignalsPanel(){
+  var el=document.getElementById('signals-panel');
+  var sharp=games.filter(function(g){return detectSignal(g)==='sharp';});
+  document.getElementById('m-signals').textContent=sharp.length;
+  if(!sharp.length){el.innerHTML='<div class="empty"><div class="empty-icon">◎</div><div class="empty-title">No sharp signals</div><div class="empty-desc">Will flag when Pinnacle diverges 10+ points.</div></div>';return;}
+  var html='';
+  sharp.forEach(function(game){
+    var teams=getTeams(game);var gap=getSharpGap(game);
+    html+='<div class="signal-card" onclick="selectGame(\''+game.fixtureId+'\')">'
+      +'<div class="signal-card-header"><span class="signal-card-game">'+teams.away+' @ '+teams.home+'</span><span class="tag tag-sharp">+'+Math.round(gap)+' pts</span></div>'
+      +'<div class="signal-card-detail">Pinnacle diverging from soft books</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+function selectGame(id){
+  selectedGame=games.find(function(g){return g.fixtureId===id;});if(!selectedGame)return;
+  document.getElementById('select-prompt').style.display='none';
+  document.getElementById('game-detail').style.display='block';
+  var histPanel=document.getElementById('historical-panel');
+  if(histPanel)histPanel.innerHTML='<div style="color:var(--hint);font-size:12px;padding:0.375rem 0;">Pull every Pinnacle line movement since this game opened — 1 API request.</div>';
+  var histBtn=document.getElementById('hist-btn');
+  if(histBtn){histBtn.disabled=false;histBtn.textContent='Pull full history (1 request)';}
+  renderGames();renderDetail();
+}
+
+function renderDetail(){
+  if(!selectedGame)return;
+  var teams=getTeams(selectedGame);
+  var time=new Date(selectedGame.startTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('detail-title').textContent=teams.away+' @ '+teams.home;
+  document.getElementById('detail-time').textContent=time+' · '+(SPORT_IDS[currentSportId]||'');
+  var sig=detectSignal(selectedGame);
+  document.getElementById('detail-signal-tag').innerHTML=sig==='sharp'?'<span class="tag tag-sharp">Sharp signal</span>':sig==='watch'?'<span class="tag tag-watch">Watch</span>':'<span class="tag tag-neutral">Stable</span>';
+  renderSignalBanner(sig);renderBookComparison();renderGapAnalysis();renderMovementChart();renderHistoryPanel();
+}
+
+function renderSignalBanner(sig){
+  var el=document.getElementById('signal-banner-detail');var gap=getSharpGap(selectedGame);
+  if(sig==='sharp'){el.className='signal-banner sharp';el.style.display='flex';el.innerHTML='<span>⚡</span><span><strong>Sharp signal detected.</strong> Pinnacle is '+(gap?Math.round(gap)+' points':'')+' off the soft book price.</span>';}
+  else if(sig==='watch'){el.className='signal-banner watch';el.style.display='flex';el.innerHTML='<span>◉</span><span><strong>Watch this line.</strong> Pinnacle is starting to diverge. Track to see if the gap widens.</span>';}
+  else{el.style.display='none';}
+}
+
+function getSpreadLine(bookData){
+  if(!bookData||!bookData.markets)return null;
+  var result=null;
+  Object.values(bookData.markets).forEach(function(m){
+    if(result||!m.marketActive)return;
+    var bmid=(m.bookmakerMarketId||'').toLowerCase();
+    if(bmid.indexOf('altline')>-1||bmid.indexOf('teamtotal')>-1)return;
+    // Must be identified as spread/runline/handicap by market name
+    var isSpread=bmid.indexOf('spread')>-1||bmid.indexOf('runline')>-1||bmid.indexOf('handicap')>-1;
+    if(!isSpread)return;
+    var ov=Object.values(m.outcomes||{});if(ov.length<2)return;
+    var h=ov[0].players&&ov[0].players['0']?ov[0].players['0']:null;
+    var a=ov[1].players&&ov[1].players['0']?ov[1].players['0']:null;
+    if(!h||!a||!h.active||!a.active)return;
+    if(!h.mainLine)return;
+    // Extract handicap from outcomeId - must look like "-1.5/home" or "-1.5/away" or just "-1.5"
+    var hoid=h.bookmakerOutcomeId||'';
+    var hdp='';
+    // Only use outcomeId if it contains a decimal point (handicap) or starts with - or small number
+    var hdpMatch=hoid.match(/^(-?\d{1,2}\.?\d?)(?:\/|$)/);
+    if(hdpMatch){hdp=hdpMatch[1];}
+    else{
+      // Try getting from market name like "altLine/4/487/.../spreads" -> look for number before spreads
+      var mparts=bmid.split('/');
+      for(var pi=0;pi<mparts.length;pi++){
+        var pv=parseFloat(mparts[pi]);
+        if(!isNaN(pv)&&Math.abs(pv)<=20&&mparts[pi].indexOf('.')>-1){hdp=mparts[pi];break;}
+      }
+    }
+    if(!hdp)return; // Skip if we can't get a valid handicap
+    result={hdp:hdp,homeOdds:fmtAmerican(h.price),awayOdds:fmtAmerican(a.price)};
+  });
+  return result;
+}
+function getTotalLine(bookData){
+  if(!bookData||!bookData.markets)return null;
+  var result=null;
+  Object.values(bookData.markets).forEach(function(m){
+    if(result||!m.marketActive)return;
+    var bmid=(m.bookmakerMarketId||'').toLowerCase();
+    if(bmid.indexOf('altline')>-1||bmid.indexOf('teamtotal')>-1)return;
+    var isTotal=bmid.indexOf('total')>-1||bmid.indexOf('over')>-1||bmid.indexOf('ou')>-1;
+    if(!isTotal)return;
+    var ov=Object.values(m.outcomes||{});if(ov.length<2)return;
+    var o=ov[0].players&&ov[0].players['0']?ov[0].players['0']:null;
+    var u=ov[1].players&&ov[1].players['0']?ov[1].players['0']:null;
+    if(!o||!u||!o.active||!u.active)return;
+    if(!o.mainLine)return;
+    var ooid=o.bookmakerOutcomeId||'';
+    // Extract total points - must be a number like "8.5" or "211.5/over"
+    var pts='';
+    var ptsMatch=ooid.match(/(\d{1,3}\.?\d?)(?:\/|$)/);
+    if(ptsMatch){
+      var ptsVal=parseFloat(ptsMatch[1]);
+      if(ptsVal>0&&ptsVal<300)pts=ptsMatch[1]; // sanity check
+    }
+    if(!pts)return; // Skip if we can't get valid total
+    result={pts:pts,overOdds:fmtAmerican(o.price),underOdds:fmtAmerican(u.price)};
+  });
+  return result;
+}
+function renderBookComparison(){
+  var el=document.getElementById('book-comparison');var bks=selectedGame.bookmakerOdds||{};
+  var teams=getTeams(selectedGame);var selBooks=getSelectedBooks();var html='';
+  var mid=getMarketId(selectedGame);
+  var homeShort=teams.home.split(' ').pop();var awayShort=teams.away.split(' ').pop();
+  html+='<div style="display:grid;grid-template-columns:140px 1fr 1fr 1fr;gap:4px;padding:0.4rem 0;border-bottom:1px solid var(--border);">'
+    +'<span style="font-size:10px;color:var(--hint);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;align-self:end;">Book</span>'
+    +'<div style="text-align:right;font-size:10px;color:var(--hint);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;"><div>Moneyline</div><div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:2px;"><span>'+homeShort+'</span><span>'+awayShort+'</span></div></div>'
+    +'<div style="text-align:right;font-size:10px;color:var(--hint);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;"><div>Spread</div><div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:2px;"><span>Hdp</span><span>Odds</span></div></div>'
+    +'<div style="text-align:right;font-size:10px;color:var(--hint);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;"><div>Total</div><div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:2px;"><span>Pts</span><span>O/U</span></div></div>'
+    +'</div>';
+  selBooks.forEach(function(bk){
+    var bkData=bks[bk];
+    var mlVals=getMarketOdds(bkData,mid);if(!mlVals)return;
+    var spd=getSpreadLine(bkData);var tot=getTotalLine(bkData);
+    var isSharp=bk==='pinnacle'||bk==='singbet';var color=BOOK_COLORS[bk]||'#888';
+    html+='<div style="display:grid;grid-template-columns:140px 1fr 1fr 1fr;gap:4px;align-items:center;padding:0.625rem 0;border-bottom:1px solid var(--border);">'
+      +'<div style="display:flex;align-items:center;gap:6px;"><div style="width:3px;height:32px;border-radius:2px;background:'+color+';flex-shrink:0;"></div>'
+      +'<div><div style="font-size:13px;font-weight:500;color:var(--text);">'+(BOOK_LABELS[bk]||bk)+(isSharp?' <span class="tag-black">sharp</span>':'')+'</div>'
+      +'<div style="font-size:10px;color:var(--hint);">'+(isSharp?'Sharp':'Recreational')+'</div></div></div>'
+      +'<div style="display:flex;justify-content:flex-end;gap:1rem;">'
+      +'<div style="text-align:right;"><div style="font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;">'+fmtAmerican(mlVals[0])+'</div><div style="font-size:10px;color:var(--hint);">'+homeShort+'</div></div>'
+      +'<div style="text-align:right;"><div style="font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;">'+fmtAmerican(mlVals[1])+'</div><div style="font-size:10px;color:var(--hint);">'+awayShort+'</div></div>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:flex-end;gap:1rem;">'
+      +(spd
+        ?'<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:var(--text);">'+spd.hdp+'</div><div style="font-size:10px;color:var(--hint);">home</div></div>'
+         +'<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:var(--muted);">'+spd.homeOdds+'</div><div style="font-size:10px;color:var(--hint);">odds</div></div>'
+        :'<div style="font-size:12px;color:var(--hint);">—</div>')
+      +'</div>'
+      +'<div style="display:flex;justify-content:flex-end;gap:1rem;">'
+      +(tot
+        ?'<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:var(--text);">'+tot.pts+'</div><div style="font-size:10px;color:var(--hint);">pts</div></div>'
+         +'<div style="text-align:right;"><div style="font-size:13px;color:var(--muted);">o'+tot.overOdds+'</div><div style="font-size:11px;color:var(--hint);">u'+tot.underOdds+'</div></div>'
+        :'<div style="font-size:12px;color:var(--hint);">—</div>')
+      +'</div>'
+      +'</div>';
+  });
+  el.innerHTML=html||'<div style="color:var(--hint);font-size:13px;padding:0.5rem 0;">No odds available.</div>';
+}
+
+function renderGapAnalysis(){
+  var el=document.getElementById('gap-analysis');var bks=selectedGame.bookmakerOdds||{};
+  var mid=getMarketId(selectedGame);
+  var pVals=getMarketOdds(bks['pinnacle'],mid);
+  if(!pVals){el.innerHTML='<div style="color:var(--hint);font-size:12px;">Enable Pinnacle to see gap analysis.</div>';return;}
+  var pH=parseFloat(fmtAmerican(pVals[0]));var html='';var found=false;
+  ['draftkings','fanduel','betmgm','bovada.lv'].forEach(function(sb){
+    var sVals=getMarketOdds(bks[sb],mid);if(!sVals)return;found=true;
+    var sH=parseFloat(fmtAmerican(sVals[0]));var gap=Math.round(Math.abs(pH-sH));
+    var pct=Math.min(100,(gap/30)*100);var cls=gap>=10?'sharp':gap>=5?'watch':'neutral';
+    var tagHtml=gap>=10?'<span class="tag tag-sharp">'+gap+' pt gap</span>':gap>=5?'<span class="tag tag-watch">'+gap+' pt gap</span>':'<span class="tag tag-neutral">'+gap+' pt</span>';
+    html+='<div class="gap-row"><div class="gap-header"><span class="gap-label">Pinnacle vs '+(BOOK_LABELS[sb]||sb)+'</span>'+tagHtml+'</div>'
+      +'<div class="gap-bar-wrap"><div class="gap-bar '+cls+'" style="width:'+pct+'%"></div></div></div>';
+  });
+  el.innerHTML=found?html:'<div style="color:var(--hint);font-size:12px;">Enable DraftKings or FanDuel to see gap analysis.</div>';
+}
+
+function renderMovementChart(){
+  var id=selectedGame.fixtureId;var snaps=history[id]||[];var el=document.getElementById('movement-chart');
+  var legendEl=document.getElementById('chart-legend');
+  if(chart){chart.destroy();chart=null;}
+  if(snaps.length<2){legendEl.innerHTML='<span style="font-size:12px;color:var(--hint);">Refresh again to build the movement chart.</span>';return;}
+  var labels=snaps.map(function(s){return new Date(s.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});});
+  var usedBooks=new Set();snaps.forEach(function(s){Object.keys(s.odds).forEach(function(b){usedBooks.add(b);});});
+  var datasets=[];var legendHtml='';
+  usedBooks.forEach(function(bk){
+    var color=BOOK_COLORS[bk]||'#888';
+    var data=snaps.map(function(s){return s.odds[bk]?parseFloat(fmtAmerican(s.odds[bk].home)):null;});
+    datasets.push({label:BOOK_LABELS[bk]||bk,data:data,borderColor:color,backgroundColor:'transparent',borderWidth:bk==='pinnacle'?2.5:1.5,borderDash:bk==='pinnacle'?[]:[5,4],pointRadius:3,pointBackgroundColor:color,tension:0.3,spanGaps:true});
+    legendHtml+='<div class="legend-item"><div class="legend-dot" style="background:'+color+'"></div>'+(BOOK_LABELS[bk]||bk)+(bk==='pinnacle'?' ★':'')+'</div>';
+  });
+  legendEl.innerHTML=legendHtml;
+  chart=new Chart(el,{type:'line',data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'#1f1f24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#f0eee8',bodyColor:'#9c9a92',callbacks:{label:function(ctx){return' '+ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y;}}}},
+    scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a5a56',font:{size:11},maxRotation:0},border:{display:false}},
+    y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a5a56',font:{size:11},callback:function(v){return(v>0?'+':'')+v;}},border:{display:false}}}}});
+}
+
+function renderHistoryPanel(){
+  var el=document.getElementById('history-panel');if(!selectedGame)return;
+  var id=selectedGame.fixtureId;var snaps=(history[id]||[]).slice().reverse();
+  if(!snaps.length){el.innerHTML='<div style="color:var(--hint);font-size:12px;padding:0.5rem 0;">Lines logged on each refresh.</div>';return;}
+  var books=getSelectedBooks();
+  var html='<table class="hist-table"><thead><tr><th>Time</th>';
+  books.forEach(function(bk){html+='<th>'+BOOK_LABELS[bk]+'</th>';});
+  html+='</tr></thead><tbody>';
+  snaps.slice(0,15).forEach(function(snap){
+    html+='<tr><td>'+new Date(snap.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</td>';
+    books.forEach(function(bk){var o=snap.odds[bk];html+='<td>'+(o?fmtAmerican(o.home)+' / '+fmtAmerican(o.away):'—')+'</td>';});
+    html+='</tr>';
+  });
+  html+='</tbody></table>';el.innerHTML=html;
+}
+
+async function loadHistoricalOdds(){
+  if(!selectedGame){return;}
+  var btn=document.getElementById('hist-btn');
+  var panel=document.getElementById('historical-panel');
+  if(!btn||!panel)return;
+  btn.disabled=true;btn.textContent='Loading...';
+  var books='pinnacle,draftkings,fanduel';
+  var url=API_BASE+'/historical-odds?fixtureId='+selectedGame.fixtureId+'&bookmakers='+books+'&apiKey='+apiKey;
+  try{
+    var res=await fetch(url);
+    if(!res.ok){var e=await res.json().catch(function(){return{};});throw new Error(e.message||'API error '+res.status);}
+    var data=await res.json();
+    updateQuota(1);
+    var bks=data.bookmakers||{};
+    var mid=getMarketId(selectedGame);
+    function getHistSnaps(bookData,marketId){
+      if(!bookData||!bookData.markets)return[];
+      var m=bookData.markets[marketId]||bookData.markets[Object.keys(bookData.markets)[0]]||null;
+      if(!m||!m.outcomes)return[];
+      var outcomeKeys=Object.keys(m.outcomes);
+      var homeKey=outcomeKeys[0];var awayKey=outcomeKeys[1]||null;
+      var homeSnaps=m.outcomes[homeKey]&&m.outcomes[homeKey].players&&m.outcomes[homeKey].players['0']?m.outcomes[homeKey].players['0']:[];
+      var awaySnaps=awayKey&&m.outcomes[awayKey]&&m.outcomes[awayKey].players&&m.outcomes[awayKey].players['0']?m.outcomes[awayKey].players['0']:[];
+      return{home:homeSnaps,away:awaySnaps};
+    }
+    var pinData=getHistSnaps(bks.pinnacle,mid);
+    var pinSnaps=pinData.home;var pinSnapsAway=pinData.away;
+    var dkSnaps=getHistSnaps(bks.draftkings,mid).home;
+    var fdSnaps=getHistSnaps(bks.fanduel,mid).home;
+    if(!pinSnaps.length){panel.innerHTML='<div style="color:var(--hint);font-size:12px;">No Pinnacle historical data available for this game yet.</div>';btn.disabled=false;btn.textContent='Pull full history (1 request)';return;}
+    renderHistoricalChart(pinSnaps,pinSnapsAway,dkSnaps,fdSnaps);
+    renderHistoricalTable(pinSnaps,pinSnapsAway,dkSnaps);
+    btn.textContent='Refreshed — '+pinSnaps.length+' Pinnacle moves';
+  }catch(e){
+    panel.innerHTML='<div style="color:var(--red);font-size:12px;">Error: '+e.message+'</div>';
+    btn.disabled=false;btn.textContent='Retry';
+  }
+}
+
+function renderHistoricalChart(pinHome,pinAway,dkHome,fdHome){
+  var panel=document.getElementById('historical-panel');
+  panel.innerHTML='<div class="chart-legend" id="hist-legend"></div><div style="position:relative;height:260px;"><canvas id="hist-chart" role="img" aria-label="Pinnacle historical line movement"></canvas></div>';
+  // Build time-sorted labels from pinnacle home snaps (already sorted newest first, reverse it)
+  var sorted=pinHome.slice().reverse();
+  var labels=sorted.map(function(s){return new Date(s.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});});
+  var pinData=sorted.map(function(s){return parseFloat(fmtAmerican(s.price));});
+  // Map DK and FD to same timeline by nearest timestamp
+  function mapToTimeline(snaps,timeSorted){
+    return timeSorted.map(function(s){
+      var t=new Date(s.createdAt).getTime();
+      var nearest=snaps.reduce(function(best,x){return Math.abs(new Date(x.createdAt).getTime()-t)<Math.abs(new Date(best.createdAt).getTime()-t)?x:best;},snaps[0]);
+      return nearest?parseFloat(fmtAmerican(nearest.price)):null;
+    });
+  }
+  var datasets=[{label:'Pinnacle ★',data:pinData,borderColor:'#e63946',backgroundColor:'transparent',borderWidth:2.5,pointRadius:2,pointBackgroundColor:'#e63946',tension:0.3,spanGaps:true}];
+  var legendHtml='<div class="legend-item"><div class="legend-dot" style="background:#e63946"></div>Pinnacle ★</div>';
+  if(dkHome.length){var dkData=mapToTimeline(dkHome.slice().reverse(),sorted);datasets.push({label:'DraftKings',data:dkData,borderColor:'#53d337',backgroundColor:'transparent',borderWidth:1.5,borderDash:[5,4],pointRadius:2,pointBackgroundColor:'#53d337',tension:0.3,spanGaps:true});legendHtml+='<div class="legend-item"><div class="legend-dot" style="background:#53d337"></div>DraftKings</div>';}
+  if(fdHome.length){var fdData=mapToTimeline(fdHome.slice().reverse(),sorted);datasets.push({label:'FanDuel',data:fdData,borderColor:'#1493ff',backgroundColor:'transparent',borderWidth:1.5,borderDash:[5,4],pointRadius:2,pointBackgroundColor:'#1493ff',tension:0.3,spanGaps:true});legendHtml+='<div class="legend-item"><div class="legend-dot" style="background:#1493ff"></div>FanDuel</div>';}
+  document.getElementById('hist-legend').innerHTML=legendHtml;
+  var el=document.getElementById('hist-chart');
+  new Chart(el,{type:'line',data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'#1f1f24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#f0eee8',bodyColor:'#9c9a92',callbacks:{label:function(ctx){return' '+ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y;}}}},
+    scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a5a56',font:{size:10},maxRotation:45,maxTicksLimit:12},border:{display:false}},
+    y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a5a56',font:{size:11},callback:function(v){return(v>0?'+':'')+v;}},border:{display:false}}}}});
+}
+
+function renderHistoricalTable(pinHome,pinAway,dkHome){
+  // Sort oldest first for chronological movement display
+  var sorted=pinHome.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+  var awaySorted=pinAway.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+  var dkSorted=dkHome.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+  // Show newest first in table
+  sorted=sorted.reverse();awaySorted=awaySorted.reverse();dkSorted=dkSorted.reverse();
+  var teams=getTeams(selectedGame);
+  var homeShort=teams.home.split(' ').pop();var awayShort=teams.away.split(' ').pop();
+  var html='<div style="overflow-x:auto;margin-top:0.75rem;"><table class="hist-table"><thead><tr>'
+    +'<th>Time</th>'
+    +'<th>Pin '+homeShort+'</th>'
+    +'<th>Pin '+awayShort+'</th>'
+    +'<th>Move</th>'
+    +'</tr></thead><tbody>';
+  var prevPinH=null;
+  sorted.slice(0,25).forEach(function(snap,i){
+    var pinH=parseFloat(fmtAmerican(snap.price));
+    var pinA=awaySorted[i]?parseFloat(fmtAmerican(awaySorted[i].price)):null;
+    var move='';var moveColor='var(--muted)';
+    if(prevPinH!==null){
+      var diff=pinH-prevPinH;
+      if(Math.abs(diff)>=1){move=(diff>0?'+':'')+Math.round(diff);moveColor=diff>0?'var(--green)':'var(--red)';}
+    }
+    prevPinH=pinH;
+    html+='<tr><td>'+new Date(snap.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</td>'
+      +'<td style="color:var(--text);font-weight:500;">'+(pinH>0?'+':'')+pinH+'</td>'
+      +'<td style="color:var(--muted);">'+(pinA!==null?(pinA>0?'+':'')+pinA:'—')+'</td>'
+      +'<td style="color:'+moveColor+';font-weight:600;">'+move+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  document.getElementById('historical-panel').innerHTML+=html;
+}
+
+window.onload=init;
+</script>
+</body>
+</html>
